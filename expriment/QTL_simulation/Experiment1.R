@@ -8,6 +8,7 @@
 rm(list=ls())
 save.file=F
 graphics.off()
+library(NPBayes)
 library(bigstep)
 library(PolyMixed)
 library(RcppEigen)
@@ -37,6 +38,8 @@ sigma <- 1               # sd for error term
 tau <- 0.01              # sd for polygenic effect
 mu <- rep(0.004, q)      # mean for polygenic effect
 
+
+n.gibbs <- 2000 #samples for MCMC
 
 nc = NULL
 qtl.pos <- c(151, 824, 1274)
@@ -117,5 +120,14 @@ for(n in ns){
         sslasso.fit <- SSLASSO(Xs[[i]], ys[[i]], variance = "unknown")
         index <- sslasso.fit$model
         betas.SSlasso[[i]] <- cbind(index, sslasso.fit$beta[sslasso.fit$model,ncol(sslasso.fit$beta)])
+
+
+        #hBayes
+        res <- gibbs.normal(n.gibbs,
+                            ys[[i]],
+                            Xs[[i]],
+                            c(-5,5),
+                            7,
+                            as.vector(coef.lasso[-1]))
     }
 }
