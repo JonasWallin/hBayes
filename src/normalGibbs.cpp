@@ -7,7 +7,7 @@ using namespace Rcpp;
 using namespace arma;
 
 
-double normalloglik(const arma::vec& res, const double sigma)
+double normalloglik_(const arma::vec& res, const double sigma)
 {
     double lik = - ((double) res.size() )* log(sigma);
     lik += -0.5 *  sum(res % res)/pow(sigma,2);
@@ -41,7 +41,7 @@ Rcpp::List sample_gibbs_beta_normal_cpp(const arma::vec& Y,
     arma::vec H  =  X2diag;
     arma::vec sd  = pow(sigma,2)/H;
     sd = arma::sqrt(sd);
-    double log_lik        =   normalloglik(residual, sigma);
+    double log_lik        =   normalloglik_(residual, sigma);
 
     for (uword i = 0; i < p; ++i) {
 
@@ -84,7 +84,7 @@ Rcpp::List sample_gibbs_beta_normal_cpp(const arma::vec& Y,
             arma::vec  Xbeta_star =  Xbeta + Xi * (beta_i_star- beta(i));
 
             arma::vec residual_star     = Y - Xbeta_star;
-            double log_lik_star     =   normalloglik(residual_star, sigma);
+            double log_lik_star     =   normalloglik_(residual_star, sigma);
 
 
             double mu_star = beta_i_star + sum(Xi % residual_star)/H(i);

@@ -9,6 +9,10 @@ sample_gibbs_beta_normal_cpp <- function(Y, Xbeta, X, sigma, X2diag, beta, betai
     .Call(`_NPBayes_sample_gibbs_beta_normal_cpp`, Y, Xbeta, X, sigma, X2diag, beta, betaind, avec, pivec, innersample, interval_sample)
 }
 
+permute_gibbs_beta_normal_cpp <- function(Y, Xbeta, X, sigma, beta, betaind) {
+    .Call(`_NPBayes_permute_gibbs_beta_normal_cpp`, Y, Xbeta, X, sigma, beta, betaind)
+}
+
 rcpp_hello <- function() {
     .Call(`_NPBayes_rcpp_hello`)
 }
