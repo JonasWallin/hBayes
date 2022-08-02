@@ -8,18 +8,22 @@
 rm(list=ls())
 save.fig=F
 graphics.off()
-library(NPBayes)
+library(doParallel)
+library(purrr)
 library(bigstep)
 library(PolyMixed)
 library(RcppEigen)
 library(ggplot2)
-library(SSLASSO)
-library(glmnet)
 library(bigstep)
-set.seed(10)
-distribution = c(1)  # 1 - gaussian random effect, 2- Laplace randeom effect, 3 -sparse
-shift <- -0.01 #-0.02 # shift in the laplace distribution
-q     <- 10    # number of simulations
+set.seed(12)
+
+n.gibbs <- 10000 #samples for MCMC
+n_cores = 8
+distribution = c(2)  # 1 - gaussian random effect, 2- Laplace randeom effect, 3 -sparse
+shift <- -2. #-0.02 # shift in the laplace distribution
+nu <- 0.75 #assymetry in Laplace distribution
+q     <- 100   # number of simulations
+n_cores <- min(q, n_cores)
 #thin =  how often to observe X (i.e. cm distnace)
 #type =  1 - pure measurement error (\sigma^2I )
 #        2 -  mixed effect     (\sigma^2I + XX^T \tau )
@@ -36,23 +40,23 @@ markers <- rep(m, chr)   # markers on each chromosome
 ns <-  400            # observations
 d <- 1                   # distance between markers (cM)
 sigma <- 0.1               # sd for error term
-tau <- 0.01              # sd for polygenic effect
-mu <- rep(0.01, q)      # mean for polygenic effect
+tau <- 0.005              # sd for polygenic effect
+mu <- -rep(0.01, q)      # mean for polygenic effect
 
 
-n.gibbs <- 1000 #samples for MCMC
 
 nc = NULL
 qtl.pos <- ceiling(M * c(0.2,0.5,0.8))
-mag = 0.35
+mag.pos = 0.1
+mag.neg = 0.2
 if(signal==1){
     mag = 0.5
 }else if(signal==-1){
     mag = 0
 }
-qtl  <- c(mag, qtl.pos[1], 1) # qtl (beta; position: marker, trait or traits)
-qtl2 <- c(mag, qtl.pos[2], 1)
-qtl3 <- c(-mag, qtl.pos[3], 1)
+qtl  <- c(mag.pos, qtl.pos[1], 1) # qtl (beta; position: marker, trait or traits)
+qtl2 <- c(mag.pos, qtl.pos[2], 1)
+qtl3 <- c(-mag.neg, qtl.pos[3], 1)
 beta.true <- c(qtl[1], qtl2[1], qtl3[1])
 
 # --------------------------------------------------------------------------
@@ -71,8 +75,7 @@ for(n in ns){
     Xs <- Xs_new <- list()
     ys <- ys_new <- ys_new2 <- list()
     betas <- list()
-    betas.lasso <- betas.SSlasso <- betas.ridge <- beta.npbayes <- list()
-    intercept.ridge <- intercept.lasso <- intercept.sslasso <- vector(length=q, mode="numeric")
+
     dupls <- list()
     SVDXs <- list()
     for(i in 1:q) {
@@ -86,8 +89,8 @@ for(n in ns){
             beta_    = tau * Z
             beta_[qtl.pos] <- beta.true
         }else if(distribution==2){
-            V <- rgamma(dim(X)[2],1)
-            beta_ <- mu[1] + shift * (V-1) + tau * sqrt(V)*Z
+            V <- rgamma(dim(X)[2],nu,nu)
+            beta_ <- mu[1] + tau * (shift * (V-1) +  sqrt(V)*Z)
             beta_[qtl.pos] <- beta.true
 
         }else if(distribution == 3){
@@ -115,43 +118,137 @@ for(n in ns){
 
 
     }
-    for(i in 1:q){
-        # Lasso
+
+    cl <- makeCluster(n_cores, outfile="")
+    registerDoParallel(cl)
+    i0 = 1
+    par.out <- foreach(i = i0:q)%dopar%{
+
+        library(glmnet)
+        library(SSLASSO)
+        library(NPBayes)
+        library(PolyMixed)
+        cat('i=',i,'\n')
+        set.seed(i)
+        #unadjusted lasso
         cvfit <- cv.glmnet(Xs[[i]], ys[[i]])
         coef.lasso <- coef(cvfit, s = "lambda.1se")
         index.lasso <- which(coef.lasso!=0)
         index.lasso <- index.lasso[-1]
-        betas.lasso[[i]] <-cbind(index.lasso-1, coef.lasso[index.lasso])
-        intercept.lasso[i] <-coef.lasso[1]
+        lasso.beta <- rep(0,dim(X)[2])
+        lasso.beta[index.lasso-1] <- coef.lasso[index.lasso]
+        betas.lasso_unadj <- lasso.beta
+        intercept.lasso_unadj <-coef.lasso[1]
+
+
+        # Lasso
+        cvfit <- cv.glmnet(cbind(rowSums(Xs[[i]]),Xs[[i]]), ys[[i]])
+        coef.lasso <- coef(cvfit, s = "lambda.1se")
+        index.lasso <- which(coef.lasso!=0)
+        index.lasso <- index.lasso[-(1:2)]
+        lasso.beta <- rep( coef.lasso[2],dim(X)[2])
+        lasso.beta[index.lasso-2] <- lasso.beta[index.lasso-2]  + coef.lasso[index.lasso]
+        betas.lasso <- lasso.beta
+        intercept.lasso <-coef.lasso[1]
 
         #Spike and slab lasso
+        sslasso.fit <- SSLASSO(cbind(rowSums(Xs[[i]]),Xs[[i]]), ys[[i]], variance = "unknown")
+        index <- setdiff(sslasso.fit$model,1)
+        sslasso.beta <- rep( sslasso.fit$beta[1, ncol(sslasso.fit$beta)], dim(X)[2])
+        sslasso.beta[index-1] <- sslasso.beta[index-1] + sslasso.fit$beta[setdiff(sslasso.fit$model,1),ncol(sslasso.fit$beta)]
+        betas.SSlasso <- sslasso.beta
+        intercept.sslasso <- sslasso.fit$intercept[1,dim(sslasso.fit$intercept)[2]]
+
         sslasso.fit <- SSLASSO(Xs[[i]], ys[[i]], variance = "unknown")
         index <- sslasso.fit$model
-        betas.SSlasso[[i]] <- cbind(index, sslasso.fit$beta[sslasso.fit$model,ncol(sslasso.fit$beta)])
-        intercept.sslasso[i] <- sslasso.fit$intercept[1,dim(sslasso.fit$intercept)[2]]
+        sslasso.beta <- rep( 0, dim(X)[2])
+        sslasso.beta[index-1] <- sslasso.fit$beta[setdiff(sslasso.fit$model,1),ncol(sslasso.fit$beta)]
+        betas.SSlasso_unadj <- sslasso.beta
+        intercept.sslasso_unadj <- sslasso.fit$intercept[1,dim(sslasso.fit$intercept)[2]]
+
+
         #ridge regression
+        cvfit <- cv.glmnet(cbind(rowSums(Xs[[i]]),Xs[[i]]), ys[[i]], alpha=0)
+        coef.ridge <- coef(cvfit, s = "lambda.1se")
+        betas.ridge <- coef.ridge[-(1:2)] + coef.ridge[2]
+        intercept.ridge <- coef.ridge[1]
+
+
         cvfit <- cv.glmnet(Xs[[i]], ys[[i]], alpha=0)
         coef.ridge <- coef(cvfit, s = "lambda.1se")
-        betas.ridge[[i]] <- coef.ridge[-1]
-        intercept.ridge[i] <- coef.ridge[1]
+        betas.ridge_unadj <- coef.ridge[-1]
+        intercept.ridge_unadj <- coef.ridge[1]
         #hBayes
-        #res <- gibbs.normal(n.gibbs,
-        #                    ys[[i]],
-        #                    Xs[[i]],
-        #                    c(-0.5,0.5),
-        #                    7,
-        #                    sslasso.fit$beta[,ncol(sslasso.fit$beta)])
-        res <- gibbs.normal.fixed.sigma(n.gibbs,
+        res <- gibbs.normal(n.gibbs,
                             ys[[i]],
                             Xs[[i]],
-                            sigma,
                             c(-0.5,0.5),
                             8,
-                            sslasso.fit$beta[,ncol(sslasso.fit$beta)])
+                            betas.ridge_unadj)
+        #res <- gibbs.normal.fixed.sigma(n.gibbs,
+        #                    ys[[i]],
+        #                    Xs[[i]],
+        #                    sigma,
+        #                    c(-0.5,0.5),
+        #                    8,
+        #                    sslasso.fit$beta[,ncol(sslasso.fit$beta)])
 
-        beta.npbayes[[i]] <-  colMeans(res$beta.gibbs[floor(n.gibbs/3):n.gibbs,])
+        beta.npbayes <-  base::colMeans(res$beta.gibbs[floor(n.gibbs/3):n.gibbs,])
+
+
+
+        #forward backward
+        MixGeneObj <- SetupGeneMix('Y ~ 1',
+                                   data = data.frame(Y=ys[[i]]),
+                                   X=Xs[[i]],
+                                   meanMuOff = F,
+                                   tauOff = F)
+
+        MixGeneObj <- mixedModelForwardBackward(MixGeneObj,
+                                                markers,
+                                                dupl  = findDuplicate(Xs[[i]]))
+        #compute posterior estimate of beta
+        Q_2 = (t(Xs[[i]])%*%Xs[[i]])/MixGeneObj$sigma^2
+        diag(Q_2) <- diag(Q_2)  + 1/MixGeneObj$tau^2
+        Ebeta_2 = solve(Q_2, (t(Xs[[i]])%*%(ys[[i]] - MixGeneObj$beta[1] - Xs[[i]][,MixGeneObj$find,drop=F]%*%MixGeneObj$beta[-c(1:2)]))/MixGeneObj$sigma^2 + MixGeneObj$beta[2]/ MixGeneObj$tau^2 )
+        Ebeta_2[MixGeneObj$find] =Ebeta_2[MixGeneObj$find] +MixGeneObj$beta[-c(1:2)]
+
+        beta.forwardback <- Ebeta_2
+        intercept.forwardback <-  MixGeneObj$beta[1]
+
+
+        list( betas.lasso = betas.lasso,
+              intercept.lasso =intercept.lasso,
+
+              betas.lasso_unadj = betas.lasso_unadj,
+              intercept.lasso_unadj = intercept.lasso_unadj,
+
+              betas.SSlasso = betas.SSlasso,
+              intercept.sslasso = intercept.sslasso,
+
+              betas.SSlasso_unadj = betas.SSlasso_unadj,
+              intercept.sslasso_unadj = intercept.sslasso_unadj,
+
+              betas.ridge = betas.ridge,
+              intercept.ridge = intercept.ridge,
+
+
+              betas.ridge_unadj = betas.ridge_unadj,
+              intercept.ridge_unadj = intercept.ridge_unadj,
+
+              beta.npbayes = beta.npbayes,
+
+              beta.forwardback=  beta.forwardback,
+              intercept.forwardback = intercept.forwardback
+              )
     }
+    list2env(purrr::transpose(par.out),globalenv())
+    stopCluster(cl)
+    save( betas.lasso,intercept.lasso, betas.SSlasso, intercept.sslasso, betas.ridge, intercept.ridge, beta.npbayes,beta.forwardback,intercept.forwardback, file = "simulation2.RData")
 }
+
+
+
 library(zoo)
 library(ggplot2)
 window.size= 10
@@ -160,6 +257,7 @@ plot.graph <- function(x,
                        window.size,
                        markers,
                        beta_true= NULL,
+                       name='',
                        x.sim = NULL){
     x.window <- rep(0,length(x))
     beta_true.window = rep(0, length(x))
@@ -187,6 +285,7 @@ plot.graph <- function(x,
     df <- data.frame(locus = 1:length(x.window), beta = x.window)
     fig <- ggplot(df)
     if(!is.null(beta_true))
+
         fig <- fig + geom_line(data=data.frame(locus = 1:length(x.window), beta = beta_true.window),
                                aes(x=locus, y= beta),
                                colour ="red",
@@ -196,79 +295,128 @@ plot.graph <- function(x,
                              colour ="blue",
                              linetype = "dashed",
                              alpha = 0.5)
+    fig <- fig + ylab(TeX("$\\beta$"))+ theme(axis.title.y = element_text(angle=0,vjust=0.5,size=20,face="bold"),
+                                              axis.title.x = element_text(size=16,face="bold"))
     if(!is.null(x.sim)){
         fig <- fig  + geom_ribbon(data = data.frame(locus=1:length(x),
                                                           low = CI[,1]
                                                           ,upp = CI[,2]),
                                         aes(x=locus,ymin = low, ymax=upp), alpha=0.2, fill='blue')
     }
+    fig <- fig +  labs(title=paste(name))
+    #fig <- fig +  labs(title=paste(name,', RMSE = ',round(sqrt(mean((beta_true.window-x.window)^2))/sd(beta_true.window),3) , ", window size = ", window.size,sep=""))
+    fig <- fig+ theme(plot.title = element_text(hjust = 0.5, size=20))
 
-    return(list(fig=fig, res = beta_true.window-x.window ) )
+    return(list(fig=fig, res = beta_true.window-x.window, beta_true = beta_true.window ) )
 }
+i=1
 library(latex2exp)
-res.lasso <- plot.graph(coef.lasso[-1],window.size, markers, beta_true = beta_)
+res.lasso <- plot.graph(betas.lasso[[q]],window.size, markers, beta_true = beta_,name="lasso")
 fig.lasso <- res.lasso$fig
-fig.lasso <- fig.lasso +  labs(title=paste('MSE = ',round(sqrt(mean(res.lasso$res^2)),3) , " (window size = ", window.size,")",sep=""))
-fig.lasso <- fig.lasso+ theme(plot.title = element_text(hjust = 0.5))
 
 print(fig.lasso)
 if(save.fig)
     ggsave('lasso.jpeg',fig.lasso)
 
-res.sslasso <- plot.graph(sslasso.fit$beta[,ncol(sslasso.fit$beta)],window.size, markers, beta_true = beta_)
+res.lasso_un <- plot.graph(betas.lasso_unadj[[q]],window.size, markers, beta_true = beta_,name="lasso unadj")
+fig.lasso_un <- res.lasso_un$fig
+
+print(fig.lasso_un)
+if(save.fig)
+    ggsave('lasso_un.jpeg',fig.lasso_un)
+
+
+res.ridge <- plot.graph(betas.ridge[[q]],window.size, markers, beta_true = beta_,name="ridge adj")
+fig.ridge <- res.ridge$fig
+
+print(fig.ridge)
+if(save.fig)
+    ggsave('ridge.jpeg',fig.ridge)
+
+res.ridge <- plot.graph(betas.ridge_unadj[[q]],window.size, markers, beta_true = beta_,name="ridge")
+fig.ridge_unadj <- res.ridge$fig
+
+print(fig.ridge_unadj)
+if(save.fig)
+    ggsave('ridge_un.jpeg',fig.ridge_unadj)
+
+res.sslasso <- plot.graph(betas.SSlasso[[q]],window.size, markers, beta_true = beta_,name="SSlasso")
 fig.sslasso <- res.sslasso$fig
-fig.sslasso <- fig.sslasso +  labs(title=paste('MSE = ',round(sqrt(mean(res.sslasso$res^2)),3) , " (window size = ", window.size,")",sep=""))
-fig.sslasso <- fig.sslasso+ theme(plot.title = element_text(hjust = 0.5))
 
 print(fig.sslasso)
 if(save.fig)
     ggsave('sslasso.jpeg',fig.sslasso)
 
 
-Betas.np <- colMeans(res$beta.gibbs[floor(n.gibbs/3):n.gibbs,])
-res.np <- plot.graph(Betas.np,window.size, markers, beta_true = beta_, x.sim =res$beta.gibbs[floor(n.gibbs/3):n.gibbs,] )
+res.sslasso <- plot.graph(betas.SSlasso_unadj[[q]],window.size, markers, beta_true = beta_,name="SSlasso unadj")
+fig.sslasso_unadj <- res.sslasso$fig
+
+print(fig.sslasso_unadj)
+if(save.fig)
+    ggsave('sslasso_unadj.jpeg',fig.sslasso_unadj)
+
+res.np <- plot.graph(beta.npbayes[[q]],window.size, markers, beta_true = beta_ ,name="Polya prior")
 fig.np <- res.np$fig
-fig.np <- fig.np +  labs(title=paste('MSE = ',round(sqrt(mean(res.np$res^2)),3) , " (window size = ", window.size,")",sep=""))
-fig.np <- fig.np+ theme(plot.title = element_text(hjust = 0.5))
 
 print(fig.np)
 if(save.fig)
     ggsave('bayes.jpeg',fig.np)
+
+library(latex2exp)
+res.fb <- plot.graph(beta.forwardback[[q]],window.size, markers, beta_true = beta_,name="mixed effect")
+fig.fb <- res.fb$fig
+
+print(fig.fb)
+if(save.fig)
+    ggsave('fb.jpeg',fig.fb)
+
+
+
+
 #geom_ribbon(aes(ymin = Anomaly10y - Unc10y, ymax = Anomaly10y + Unc10y), alpha = 0.2)
-cat('lasso var:',round(var(zoo::rollsum(coef.lasso[-1],window.size )-zoo::rollsum(beta_,window.size)),4),'\n')
-cat('nbayes var:',round(var( zoo::rollsum(colMeans(res$beta.gibbs[floor(n.gibbs/3):n.gibbs,]),window.size)-zoo::rollsum(beta_,window.size)),4),'\n')
+#cat('lasso var:',round(var(zoo::rollsum(coef.lasso[-1],window.size )-zoo::rollsum(beta_,window.size)),4),'\n')
+#cat('nbayes var:',round(var( zoo::rollsum(colMeans(res$beta.gibbs[floor(n.gibbs/3):n.gibbs,]),window.size)-zoo::rollsum(beta_,window.size)),4),'\n')
 
 
 
-if(M < n){
-    LS <- solve(t(X)%*%X,t(X)%*%y)
-    plot(zoo::rollsum( LS,window.size), xlab='locus', ylab='beta',type='l',main='LS')
-    lines(zoo::rollsum(beta_,window.size),col='red')
-    cat('LS var:',round(var( zoo::rollsum(LS,window.size)-zoo::rollsum(beta_,window.size)),4),'\n')
-}
+
 
 ###
 # computing predictive power
 #
 ###
-MSE_XB_lasso <- MSE_XB_SS <- MSE_XB_ridge <- MSE_XB_npbayes <- rep(0,q)
-MSE_beta_lasso <- MSE_beta_SS <- MSE_beta_ridge <- MSE_beta_npbayes <- rep(0,q)
+MSE_XB_lasso <- MSE_XB_SS <- MSE_XB_ridge <- MSE_XB_fb <- MSE_XB_npbayes <- rep(0,q)
+MSE_beta_lasso <- MSE_beta_SS <- MSE_beta_ridge <-MSE_beta_fb <- MSE_beta_npbayes <- rep(0,q)
 for(i in 1:q){
-    beta_lasso <- rep(0,length(beta_))
-    beta_lasso[betas.lasso[[i]][,1]] <- betas.lasso[[i]][,2]
-    MSE_XB_lasso[i] <- sqrt(mean((Xs[[i]]%*%betas[[i]]- Xs[[i]]%*%beta_lasso - intercept.lasso[i])^2))
-    MSE_beta_lasso[i] <- sqrt(mean((betas[[i]]  -beta_lasso )^2))
+    XB <- Xs[[i]]%*%betas[[i]]
+    MSE_XB_lasso[i] <- sqrt(mean((XB- Xs[[i]]%*%betas.lasso[[i]] - intercept.lasso[[i]])^2))/sd(XB)
+    MSE_beta_lasso[i] <- sqrt(mean((betas[[i]]  -betas.lasso[[i]] )^2))/sd(betas[[i]])
 
-    beta_SS <- rep(0,length(beta_))
-    beta_SS[betas.SSlasso[[i]][,1]] <- betas.SSlasso[[i]][,2]
-    MSE_XB_SS[i] <- sqrt(mean((Xs[[i]]%*%betas[[i]]- Xs[[i]]%*%beta_SS - intercept.sslasso[i])^2))
-    MSE_beta_SS[i] <- sqrt(mean((betas[[i]]  -beta_SS )^2))
+    MSE_XB_SS[i] <- sqrt(mean((XB- Xs[[i]]%*%betas.SSlasso[[i]] - intercept.sslasso[[i]])^2))/sd(XB)
+    MSE_beta_SS[i] <- sqrt(mean((betas[[i]]  -betas.SSlasso[[i]]  )^2))/sd(betas[[i]])
 
 
-    MSE_XB_ridge[i] <- mean((Xs[[i]]%*%betas[[i]]- Xs[[i]]%*%betas.ridge[[i]] - intercept.ridge[i])^2)
-    MSE_beta_ridge[i] <- sqrt(mean((betas[[i]]  -betas.ridge[[i]] )^2))
+    MSE_XB_ridge[i] <- mean((XB- Xs[[i]]%*%betas.ridge_unadj[[i]] - intercept.ridge_unadj[[i]])^2)/sd(XB)
+    MSE_beta_ridge[i] <- sqrt(mean((betas[[i]]  -betas.ridge_unadj[[i]] )^2))/sd(betas[[i]])
 
-    MSE_XB_npbayes[i] <- sqrt(mean((Xs[[i]]%*%betas[[i]]- Xs[[i]]%*%  beta.npbayes[[i]] )^2))
-    MSE_beta_npbayes[i] <- sqrt(mean((betas[[i]]  -beta.npbayes[[i]] )^2))
+    MSE_XB_npbayes[i] <- sqrt(mean((XB- Xs[[i]]%*%  beta.npbayes[[i]] )^2))/sd(XB)
+    MSE_beta_npbayes[i] <- sqrt(mean((betas[[i]]  -beta.npbayes[[i]] )^2))/sd(betas[[i]])
+
+
+    MSE_XB_fb[i] <- sqrt(mean((XB - Xs[[i]]%*%beta.forwardback[[i]] - intercept.forwardback[[i]])^2))/sd(XB)
+    MSE_beta_fb[i] <- sqrt(mean((betas[[i]]  -beta.forwardback[[i]] )^2))/sd(betas[[i]])
+
 
 }
+Table <- rbind(c(mean(MSE_XB_lasso),mean(MSE_XB_SS),mean(MSE_XB_ridge),mean(MSE_XB_npbayes),mean(MSE_XB_fb)),
+               c(mean(MSE_beta_lasso),mean(MSE_beta_SS),mean(MSE_beta_ridge),mean(MSE_beta_npbayes),mean(MSE_beta_fb)))
+rownames(Table) <- c("MSE of $ {\\bf X} \\beta $","MSE of $ \\beta $")
+colnames(Table) <- c("lasso", "sslasso", "ridge", "non parameteric","forward backward")
+library(xtable)
+print.xtable(xtable(Table, digits=3),type="latex",sanitize.text.function = function(x) x)
+#plot true density
+#n=10^4
+#V <- rgamma(n=n,0.75,0.75)
+#Z <- rnorm(n=n)
+#B <- mu[1] + tau * (shift * (V-1) +  sqrt(V)*Z)
+
