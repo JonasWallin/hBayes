@@ -7,6 +7,7 @@ using namespace Rcpp;
 using namespace arma;
 
 
+
 double normalloglik_(const arma::vec& res, const double sigma)
 {
     double lik = - ((double) res.size() )* log(sigma);

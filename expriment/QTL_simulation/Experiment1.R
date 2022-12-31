@@ -311,14 +311,14 @@ plot.graph <- function(x,
 }
 i=1
 library(latex2exp)
-res.lasso <- plot.graph(betas.lasso[[q]],window.size, markers, beta_true = beta_,name="lasso")
+res.lasso <- plot.graph(betas.lasso[[q]],window.size, markers, beta_true = beta_,name="lasso adjusted")
 fig.lasso <- res.lasso$fig
 
 print(fig.lasso)
 if(save.fig)
     ggsave('lasso.jpeg',fig.lasso)
 
-res.lasso_un <- plot.graph(betas.lasso_unadj[[q]],window.size, markers, beta_true = beta_,name="lasso unadj")
+res.lasso_un <- plot.graph(betas.lasso_unadj[[q]],window.size, markers, beta_true = beta_,name="lasso")
 fig.lasso_un <- res.lasso_un$fig
 
 print(fig.lasso_un)
@@ -326,7 +326,7 @@ if(save.fig)
     ggsave('lasso_un.jpeg',fig.lasso_un)
 
 
-res.ridge <- plot.graph(betas.ridge[[q]],window.size, markers, beta_true = beta_,name="ridge adj")
+res.ridge <- plot.graph(betas.ridge[[q]],window.size, markers, beta_true = beta_,name="ridge adjusted")
 fig.ridge <- res.ridge$fig
 
 print(fig.ridge)
@@ -340,7 +340,7 @@ print(fig.ridge_unadj)
 if(save.fig)
     ggsave('ridge_un.jpeg',fig.ridge_unadj)
 
-res.sslasso <- plot.graph(betas.SSlasso[[q]],window.size, markers, beta_true = beta_,name="SSlasso")
+res.sslasso <- plot.graph(betas.SSlasso[[q]],window.size, markers, beta_true = beta_,name="SSlasso adjusted")
 fig.sslasso <- res.sslasso$fig
 
 print(fig.sslasso)
@@ -348,7 +348,7 @@ if(save.fig)
     ggsave('sslasso.jpeg',fig.sslasso)
 
 
-res.sslasso <- plot.graph(betas.SSlasso_unadj[[q]],window.size, markers, beta_true = beta_,name="SSlasso unadj")
+res.sslasso <- plot.graph(betas.SSlasso_unadj[[q]],window.size, markers, beta_true = beta_,name="SSlasso")
 fig.sslasso_unadj <- res.sslasso$fig
 
 print(fig.sslasso_unadj)

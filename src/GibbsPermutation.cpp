@@ -6,6 +6,10 @@ using namespace arma;
 using namespace Rcpp;
 using namespace arma;
 
+double binomaloglik_(const arma::vec& Y, const arma::vec& Xbeta, const arma::vec& expXbeta)
+{
+    return sum(Y % Xbeta - log1p(expXbeta));
+}
 
 double normalloglik(const arma::vec& res, const double sigma)
 {
@@ -69,4 +73,52 @@ Rcpp::List permute_gibbs_beta_normal_cpp(const arma::vec& Y,
     betaind += 1;
     return List::create(Named("acc.vec") = wrap(acc_vec),
                         Named("beta.ind") = wrap(betaind));
+}
+
+
+// [[Rcpp::export]]
+Rcpp::List permute_gibbs_beta_logistic_cpp(const arma::vec& Y,
+                                         arma::vec& Xbeta,
+                                         const arma::mat& X,
+                                         arma::vec& beta) {
+
+
+
+    const arma::uword p = X.n_cols;
+
+    arma::vec beta_new(p, fill::zeros);
+    arma::vec acc_vec(p, fill::zeros);
+    arma::vec expXbeta    = exp(Xbeta);
+    double log_lik        =  binomaloglik_(Y, Xbeta, expXbeta);
+
+    for (uword i = 0; i < p; ++i) {
+
+        arma::vec  Xi = X.col(i);
+        double U_  = R::runif(-0.5+1e-8, p-0.5+1e-8);
+
+        //
+        int   proposal = (int) std::round(U_);
+
+        arma::vec  Xj = X.col(proposal);
+        //log_lik_star
+        arma::vec  Xbeta_star =  Xbeta + Xi * (beta(proposal) - beta(i)) - Xj * (beta(proposal) - beta(i));
+
+
+        arma::vec expXbeta_star    = exp(Xbeta_star);
+        double log_lik_star     = binomaloglik_(Y, Xbeta_star, expXbeta_star);
+        double log_U = std::log(R::runif(0,1));
+        double MH_ratio = log_lik_star - log_lik ;
+        if(log_U  < MH_ratio){
+            double beta_swap_star =beta(proposal);
+            beta(proposal)  = beta(i);
+
+            beta(i)     = beta_swap_star;
+            log_lik     = log_lik_star;
+            Xbeta = Xbeta_star;
+            acc_vec(i) += 1.;
+        }
+    }
+
+
+    return List::create(Named("acc.vec") = wrap(acc_vec));
 }

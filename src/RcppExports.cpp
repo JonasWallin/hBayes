@@ -11,6 +11,36 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// permute_gibbs_beta_normal_cpp
+Rcpp::List permute_gibbs_beta_normal_cpp(const arma::vec& Y, arma::vec& Xbeta, const arma::mat& X, const double sigma, arma::vec& beta, arma::ivec& betaind);
+RcppExport SEXP _NPBayes_permute_gibbs_beta_normal_cpp(SEXP YSEXP, SEXP XbetaSEXP, SEXP XSEXP, SEXP sigmaSEXP, SEXP betaSEXP, SEXP betaindSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type Xbeta(XbetaSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const double >::type sigma(sigmaSEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< arma::ivec& >::type betaind(betaindSEXP);
+    rcpp_result_gen = Rcpp::wrap(permute_gibbs_beta_normal_cpp(Y, Xbeta, X, sigma, beta, betaind));
+    return rcpp_result_gen;
+END_RCPP
+}
+// permute_gibbs_beta_logistic_cpp
+Rcpp::List permute_gibbs_beta_logistic_cpp(const arma::vec& Y, arma::vec& Xbeta, const arma::mat& X, arma::vec& beta);
+RcppExport SEXP _NPBayes_permute_gibbs_beta_logistic_cpp(SEXP YSEXP, SEXP XbetaSEXP, SEXP XSEXP, SEXP betaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type Xbeta(XbetaSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type beta(betaSEXP);
+    rcpp_result_gen = Rcpp::wrap(permute_gibbs_beta_logistic_cpp(Y, Xbeta, X, beta));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sample_gibbs_beta_logistic_cpp
 Rcpp::List sample_gibbs_beta_logistic_cpp(const arma::vec& Y, arma::vec& Xbeta, const arma::mat& X, arma::vec& beta, arma::ivec& betaind, const arma::vec& avec, const arma::vec& pivec, int innersample, double interval_sample);
 RcppExport SEXP _NPBayes_sample_gibbs_beta_logistic_cpp(SEXP YSEXP, SEXP XbetaSEXP, SEXP XSEXP, SEXP betaSEXP, SEXP betaindSEXP, SEXP avecSEXP, SEXP pivecSEXP, SEXP innersampleSEXP, SEXP interval_sampleSEXP) {
@@ -51,22 +81,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// permute_gibbs_beta_normal_cpp
-Rcpp::List permute_gibbs_beta_normal_cpp(const arma::vec& Y, arma::vec& Xbeta, const arma::mat& X, const double sigma, arma::vec& beta, arma::ivec& betaind);
-RcppExport SEXP _NPBayes_permute_gibbs_beta_normal_cpp(SEXP YSEXP, SEXP XbetaSEXP, SEXP XSEXP, SEXP sigmaSEXP, SEXP betaSEXP, SEXP betaindSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const arma::vec& >::type Y(YSEXP);
-    Rcpp::traits::input_parameter< arma::vec& >::type Xbeta(XbetaSEXP);
-    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
-    Rcpp::traits::input_parameter< const double >::type sigma(sigmaSEXP);
-    Rcpp::traits::input_parameter< arma::vec& >::type beta(betaSEXP);
-    Rcpp::traits::input_parameter< arma::ivec& >::type betaind(betaindSEXP);
-    rcpp_result_gen = Rcpp::wrap(permute_gibbs_beta_normal_cpp(Y, Xbeta, X, sigma, beta, betaind));
-    return rcpp_result_gen;
-END_RCPP
-}
 // rcpp_hello
 List rcpp_hello();
 RcppExport SEXP _NPBayes_rcpp_hello() {
@@ -79,9 +93,10 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_NPBayes_permute_gibbs_beta_normal_cpp", (DL_FUNC) &_NPBayes_permute_gibbs_beta_normal_cpp, 6},
+    {"_NPBayes_permute_gibbs_beta_logistic_cpp", (DL_FUNC) &_NPBayes_permute_gibbs_beta_logistic_cpp, 4},
     {"_NPBayes_sample_gibbs_beta_logistic_cpp", (DL_FUNC) &_NPBayes_sample_gibbs_beta_logistic_cpp, 9},
     {"_NPBayes_sample_gibbs_beta_normal_cpp", (DL_FUNC) &_NPBayes_sample_gibbs_beta_normal_cpp, 11},
-    {"_NPBayes_permute_gibbs_beta_normal_cpp", (DL_FUNC) &_NPBayes_permute_gibbs_beta_normal_cpp, 6},
     {"_NPBayes_rcpp_hello", (DL_FUNC) &_NPBayes_rcpp_hello, 0},
     {NULL, NULL, 0}
 };
