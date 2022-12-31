@@ -1,7 +1,7 @@
 
 library(NPBayes)
 library(glmnet)
-n.gibbs <- 102
+n.gibbs <- 110
 sim <- 3
 burnin  <- ceiling(0.1*n.gibbs)
 n	<- 4000
