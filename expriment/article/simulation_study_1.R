@@ -2,7 +2,7 @@
 library(NPBayes)
 library(glmnet)
 n.gibbs <- 110
-sim <- 3
+sim <- 1
 burnin  <- ceiling(0.1*n.gibbs)
 n	<- 4000
 p	<- 800
@@ -14,8 +14,8 @@ X.mat	<- array(rnorm(n*p,mean = 0, sd = sqrt(1/n)),dim=c(n,p))
 
 betas <- array(dim=c(p,3))
 betas[,1] <- c(rep(-10,100),rep(10,100),rep(0,600))
-betas[,2] <- rnorm(K,mean = 3, sd = 4)
-betas[,3] <- rbinom(K,1,0.5)*rnorm(K,mean = 7, sd = 1)
+betas[,2] <- rnorm(p,mean = 3, sd = 4)
+betas[,3] <- rbinom(p,1,0.5)*rnorm(p,mean = 7, sd = 1)
 
 inv.log.odds <- function(Xbeta){
     return(1/(1+ exp(-Xbeta)))
@@ -42,6 +42,7 @@ for(i in 1:sim){
         a.min <- min(c(-24,beta.lse - 0.5))
         a.max <- max(c(24,beta.lse + 0.5))
 
+        cat('entering Gibbs')
         hBeta <- gibbs.logistic(n.gibbs,y,X.mat,c(a.min,a.max),6,as.vector(beta.ridge),cpp=T)
         beta.hBeta <- colMeans(hBeta$beta.gibbs[burnin:n.gibbs,])
         sim.mse.mat[1, i, j] <- mean((beta.lse    - betas[,j])^2)
