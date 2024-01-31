@@ -81,6 +81,31 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// house_reflection_mult_inplace_cpp
+void house_reflection_mult_inplace_cpp(arma::mat& Gamma, arma::vec v_p, bool right);
+RcppExport SEXP _NPBayes_house_reflection_mult_inplace_cpp(SEXP GammaSEXP, SEXP v_pSEXP, SEXP rightSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat& >::type Gamma(GammaSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type v_p(v_pSEXP);
+    Rcpp::traits::input_parameter< bool >::type right(rightSEXP);
+    house_reflection_mult_inplace_cpp(Gamma, v_p, right);
+    return R_NilValue;
+END_RCPP
+}
+// house_reflection_mult_cpp
+arma::mat house_reflection_mult_cpp(arma::mat Gamma, arma::vec v_p, bool right);
+RcppExport SEXP _NPBayes_house_reflection_mult_cpp(SEXP GammaSEXP, SEXP v_pSEXP, SEXP rightSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type Gamma(GammaSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type v_p(v_pSEXP);
+    Rcpp::traits::input_parameter< bool >::type right(rightSEXP);
+    rcpp_result_gen = Rcpp::wrap(house_reflection_mult_cpp(Gamma, v_p, right));
+    return rcpp_result_gen;
+END_RCPP
+}
 // rcpp_hello
 List rcpp_hello();
 RcppExport SEXP _NPBayes_rcpp_hello() {
@@ -97,6 +122,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_NPBayes_permute_gibbs_beta_logistic_cpp", (DL_FUNC) &_NPBayes_permute_gibbs_beta_logistic_cpp, 4},
     {"_NPBayes_sample_gibbs_beta_logistic_cpp", (DL_FUNC) &_NPBayes_sample_gibbs_beta_logistic_cpp, 9},
     {"_NPBayes_sample_gibbs_beta_normal_cpp", (DL_FUNC) &_NPBayes_sample_gibbs_beta_normal_cpp, 11},
+    {"_NPBayes_house_reflection_mult_inplace_cpp", (DL_FUNC) &_NPBayes_house_reflection_mult_inplace_cpp, 3},
+    {"_NPBayes_house_reflection_mult_cpp", (DL_FUNC) &_NPBayes_house_reflection_mult_cpp, 3},
     {"_NPBayes_rcpp_hello", (DL_FUNC) &_NPBayes_rcpp_hello, 0},
     {NULL, NULL, 0}
 };

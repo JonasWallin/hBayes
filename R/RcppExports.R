@@ -17,6 +17,14 @@ sample_gibbs_beta_normal_cpp <- function(Y, Xbeta, X, sigma, X2diag, beta, betai
     .Call(`_NPBayes_sample_gibbs_beta_normal_cpp`, Y, Xbeta, X, sigma, X2diag, beta, betaind, avec, pivec, innersample, interval_sample)
 }
 
+house_reflection_mult_inplace_cpp <- function(Gamma, v_p, right = TRUE) {
+    invisible(.Call(`_NPBayes_house_reflection_mult_inplace_cpp`, Gamma, v_p, right))
+}
+
+house_reflection_mult_cpp <- function(Gamma, v_p, right = TRUE) {
+    .Call(`_NPBayes_house_reflection_mult_cpp`, Gamma, v_p, right)
+}
+
 rcpp_hello <- function() {
     .Call(`_NPBayes_rcpp_hello`)
 }
