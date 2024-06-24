@@ -3,7 +3,7 @@ library(mvtnorm)
 library(MASS)
 graphics.off()
 set.seed(1)
-run.old <- TRUE
+run.old <- FALSE
 mcmc.samples <- 10000
 p <- 40
 n <- 100

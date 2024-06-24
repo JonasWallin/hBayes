@@ -141,7 +141,7 @@ vp.repr.orth.mat <- function(orth.mat)
 #'
 #' Sampling the eigenvectors
 #'
-#' @param E.init     - (p x p ) inital geuss of eigenvectors
+#' @param E.init     - (p x p ) inital guess of eigenvectors
 #' @param X          - (n x p) data assume centered
 #' @param n.mtrp     - (int) number of metropolis steps
 #' @param D          - (p x 1) eigenvalues

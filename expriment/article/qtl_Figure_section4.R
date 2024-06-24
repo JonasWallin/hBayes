@@ -14,11 +14,11 @@ list.data2 <- readRDS("MSE_sim2.rds")
 list2env(list.data,globalenv())
 list2env(list.data2,globalenv())
 #MSE_beta_fb <- MSE_beta_fb.
-Table <- rbind(c(mean(MSE_XB_lasso),mean(MSE_XB_ridge),mean(MSE_XB_fb),mean(MSE_XB_npbayes)),
-               c(mean(MSE_beta_lasso),mean(MSE_beta_ridge),mean(MSE_beta_fb),mean(MSE_beta_npbayes)),
-               c(mean(MSE_beta_smooth.lasso),mean(MSE_beta_smooth.ridge),mean(MSE_beta_smooth.fb),mean(MSE_beta_smooth.bayes)))
+Table <- rbind(c(mean(MSE_XB_lasso),mean(MSE_XB_ridge),mean(MSE_XB_fb),mean(MSE_XB_npbayes), mean(MSE_XB_HS)),
+               c(mean(MSE_beta_lasso),mean(MSE_beta_ridge),mean(MSE_beta_fb),mean(MSE_beta_npbayes), mean(MSE_beta_HS)),
+               c(mean(MSE_beta_smooth.lasso),mean(MSE_beta_smooth.ridge),mean(MSE_beta_smooth.fb),mean(MSE_beta_smooth.bayes), mean(MSE_beta_smooth_HS)))
 rownames(Table) <- c("RMSE of $ {\\bf X} \\beta $","RMSE of $ \\beta $","RMSE of $ \\beta $ smooth")
-colnames(Table) <- c("lasso",  "ridge", "mix","hBeta")
+colnames(Table) <- c("lasso",  "ridge", "mix","hBeta","horseshoe")
 
 print.xtable(xtable(Table, digits=2),type="latex",sanitize.text.function = function(x) x)
 data.RMSEbeta <- data.frame(Lasso = MSE_beta_lasso,
@@ -26,7 +26,8 @@ data.RMSEbeta <- data.frame(Lasso = MSE_beta_lasso,
                             hBayes =MSE_beta_npbayes,
                             Mix     =MSE_beta_fb,
                             Mr.Ash  = MSE_beta_ash,
-                            EMVS    = MSE_beta_EMVS)
+                            EMVS    = MSE_beta_EMVS,
+                            horseshoe = MSE_beta_HS)
 data.RMSEbeta <- pivot_longer(data.RMSEbeta, everything(),names_to = "method", values_to = "RSN")
 #if(save.fig)
 #    pdf('beta_rmse_bee.pdf')
@@ -54,7 +55,8 @@ data.RMSEbeta_smooth <- data.frame(Lasso   = MSE_beta_smooth.lasso,
                             HBayes  = MSE_beta_smooth.bayes,
                             Mix     = MSE_beta_smooth.fb,
                             Mr.ash  = MSE_beta_smooth_ash,
-                            EMVS    = MSE_beta_smooth_EMVS)
+                            EMVS    = MSE_beta_smooth_EMVS,
+                            horseshoe = MSE_beta_smooth_HS)
 data.RMSEbeta_smooth <- pivot_longer(data.RMSEbeta_smooth, everything(),names_to = "method", values_to = "RSN")
 #if(save.fig)
 #    pdf('beta_rmse_smooth_bee.pdf')
@@ -79,8 +81,9 @@ data.XBbeta <- data.frame(Lasso = MSE_XB_lasso,
                              Ridge   = MSE_XB_ridge,
                              HBayes  = MSE_XB_npbayes,
                              Mix     = MSE_XB_fb,
-                             Mr.ash  = MSE_XB_ash.,
-                             EMVS    = MSE_XB_EMVS)
+                             Mr.ash  = MSE_XB_ash,
+                             EMVS    = MSE_XB_EMVS,
+                          horseshoe= MSE_XB_HS)
 data.XBbeta <- pivot_longer(data.XBbeta, everything(),names_to = "method", values_to = "RSN")
 #if(save.fig)
 #    pdf('Xbeta_rmse_bee.pdf')

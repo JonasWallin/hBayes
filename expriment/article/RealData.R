@@ -12,10 +12,11 @@ library(ggplot2)
 library(NPBayes)
 library(glmnet)
 library(latex2exp)
+library(horseshoe) #for horseshoe
 L	<- 8
 I	<- 2^L
-burnin <-  50000
-n.gibbs <-  500000
+burnin <-  5000
+n.gibbs <-  10000
 thin <- 3 # take ever x cm
 source("misc/3-exp_matrix.R")
 
@@ -162,6 +163,16 @@ plot.graph <- function(x,
 Betas.np <-  c(apply(res$beta.gibbs[burnin:n.gibbs,], 2, quantile, probs=0.5))
 
 
+#run HORSEHOW
+
+library(horseshoe) #for horseshoe
+X <- scale(X)
+res.horse <- horseshoe(y, cbind(1,X), method.tau = "truncatedCauchy", method.sigma = "Jeffreys",
+                       nmc = 20000)
+
+
+
+
 plot.graph2 <- function(x,
                        markers,
                        beta_true= NULL,
@@ -293,12 +304,12 @@ tau <- MixGeneObj$tau
 # if(save.fig)
 #     dev.off()
 
-EX_f  = sum(res$a.vec[-1]*diff(forward_q))
-EX2_f = sum(res$a.vec[-1]^2*diff(forward_q))
-EX3_f = sum(res$a.vec[-1]^3*diff(forward_q))
-VX_f  = EX2_f - EX_f^2
-skewness_f = (EX3_f  - 3 * EX_f * VX_f - EX_f^3)/(VX_f^(3/2))
-Kurt_f = sum((res$a.vec[-1]-EX)^4*colMeans(exp(res$pi.gibbs[burnin:n.gibbs,])))/VX^2
+#EX_f  = sum(res$a.vec[-1]*diff(forward_q))
+#EX2_f = sum(res$a.vec[-1]^2*diff(forward_q))
+#EX3_f = sum(res$a.vec[-1]^3*diff(forward_q))
+#VX_f  = EX2_f - EX_f^2
+#skewness_f = (EX3_f  - 3 * EX_f * VX_f - EX_f^3)/(VX_f^(3/2))
+#Kurt_f = sum((res$a.vec[-1]-EX)^4*colMeans(exp(res$pi.gibbs[burnin:n.gibbs,])))/VX^2
 
 beta_forward <- rep(0, dim(X)[2])+MixGeneObj_forward$beta[2]
 beta_forward[ MixGeneObj_forward$find] <-beta_forward[ MixGeneObj_forward$find] + MixGeneObj_forward$beta[-(1:2)]
@@ -326,6 +337,10 @@ if(save.fig){
         ggsave(paste('CV_',i,'.pdf',sep=""), fig.np[[i]], height=6, width=10)
 }
 
+#generate the prior
+
+
+
 # Create a data frame for plotting
 df <- data.frame(
     x = res$a.vec,
@@ -333,6 +348,20 @@ df <- data.frame(
     y2 = pnorm(res$a.vec, mean = mu , sd =tau),
     y3 = pi.quant[1,],
     y4 = pi.quant[3,]
+)
+lambda.horse <- abs(rcauchy(n=length(res.horse$TauSamples)))
+pi.horse <-  matrix(0, nrow=length(res$a.vec), ncol=3)
+for(i in 1:length(res$a.vec)){
+
+    pi.horse[i, ] <- quantile(pnorm(res$a.vec[i], mean = 0 , sd =lambda.horse*sqrt(res.horse$Sigma2Samples)*res.horse$TauSamples),
+                              c(0.025,0.5,0.975))
+}
+df.horse<- data.frame(
+    x = res$a.vec,
+    y1 = pi.horse[,2],
+    y2 = pnorm(res$a.vec, mean = mu , sd =tau),
+    y3 = pi.horse[,1],
+    y4 = pi.horse[,3]
 )
 
 # Plot using ggplot2

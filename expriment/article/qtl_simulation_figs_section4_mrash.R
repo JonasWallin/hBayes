@@ -8,7 +8,7 @@
 #devtools::install_github("stephenslab/mr.ash.alpha")
 #rm(list=ls())
 plot.fig = F
-save.fig = F
+save.fig = T
 save.data = T
 graphics.off()
 source("qtl_util.R")
@@ -27,6 +27,7 @@ library(mr.ash.alpha) #devtools::install_github("stephenslab/mr.ash.alpha")
 library(susieR) #devtools::install_github("stephenslab/susieR")
 library(EMVS) #devtools::install_version("EMVS", repos = "http://cran.us.r-project.org")
 library(varbvs)
+library(horseshoe) #for horseshoe
 set.seed(12)
 
 if(plot.fig){
@@ -34,7 +35,7 @@ if(plot.fig){
     n_cores = 1
 }else{
     q     <- 200
-    n_cores = detectCores() - 4
+    n_cores = detectCores() - 6
 }
 distribution = c(2)  # 1 - gaussian random effect, 2- Laplace randeom effect, 3 -sparse
 shift <- -2. #-0.02 # shift in the laplace distribution
@@ -141,6 +142,7 @@ for(n in ns){
         library(varbvs)
         library(EMVS)
         library(SSLASSO)
+        library(horseshoe)
         # Lasso
         cvfit <- cv.glmnet(cbind(rowSums(Xs[[i]]),Xs[[i]]), ys[[i]])
         coef.lasso <- coef(cvfit, s = "lambda.1se")
@@ -185,6 +187,12 @@ for(n in ns){
         betas.SSlasso <- sslasso.beta
         intercept.sslasso <- sslasso.fit$intercept[1,dim(sslasso.fit$intercept)[2]]
 
+        hs.object <- horseshoe(ys[[i]],
+                               cbind(1,Xs[[i]]),
+                               method.tau = "truncatedCauchy",
+                               method.sigma ="Jeffreys",
+                               nmc = 6000)
+
         list(
              betas.lasso = betas.lasso,
              intercept.lasso =intercept.lasso,
@@ -199,7 +207,9 @@ for(n in ns){
              beta.EMVS = result.EMVS$betas[which(result.EMVS$log_g_function==EMVSbest(result.EMVS)$log_g_function)[1],],
              beta.EMVS2 = result.EMVS$betas[1,],
              betas.SSlasso = betas.SSlasso,
-             intercept.SSlasso = intercept.sslasso
+             intercept.SSlasso = intercept.sslasso,
+             intercept.horseshoe  = hs.object$BetaHat[1],
+             betas.horseshoe  = hs.object$BetaHat[-1]
               )
     }
     list2env(purrr::transpose(par.out),globalenv())
@@ -233,17 +243,24 @@ for(n in ns){
     # computing predictive power
     #
     ###
-    MSE_XB_EMVS <- MSE_XB_lasso <- MSE_XB_SSlasso <- MSE_XB_ash  <- MSE_XB_susie<- MSE_XB_varbvs<- MSE_XB_varbvsmix<- rep(0,q)
-    MSE_beta_EMVS <- MSE_beta_lasso <- MSE_beta_SSlasso<- MSE_beta_ash <- MSE_beta_susie <- MSE_beta_varbvs <- MSE_beta_varbvsmix <- rep(0,q)
-    beta.qtl.EMVS <- beta.qtl.lasso <- beta.qtl.SSlasso <- beta.qtl.ash <- beta.qtl.susie <- beta.qtl.varbvs <- beta.qtl.varbvsmix <- matrix(0,nrow=q, ncol = length(qtl.pos))
-    beta.smooth.qtl.EMVS <- beta.smooth.qtl.true <-  beta.smooth.qtl.lasso <- beta.smooth.qtl.SSlasso <- beta.smooth.qtl.ash <- beta.smooth.qtl.varbvs <- beta.smooth.qtl.varbvsmix<- beta.smooth.qtl.susie <- matrix(0,nrow=q, ncol = length(qtl.pos))
-    MSE_beta_smooth.EMVS <- MSE_beta_smooth.lasso <- MSE_beta_smooth.SSlasso <- MSE_beta_smooth.ash <- MSE_beta_smooth.susie <- MSE_beta_smooth.varbvs<- MSE_beta_smooth.varbvsmix<- rep(0,q)
+    MSE_XB_HS<- MSE_XB_EMVS <- MSE_XB_lasso <- MSE_XB_SSlasso <- MSE_XB_ash  <- MSE_XB_susie<- MSE_XB_varbvs<- MSE_XB_varbvsmix<- rep(0,q)
+    MSE_beta_HS <- MSE_beta_EMVS <- MSE_beta_lasso <- MSE_beta_SSlasso<- MSE_beta_ash <- MSE_beta_susie <- MSE_beta_varbvs <- MSE_beta_varbvsmix <- rep(0,q)
+    beta.qtl.HS <- beta.qtl.EMVS <- beta.qtl.lasso <- beta.qtl.SSlasso <- beta.qtl.ash <- beta.qtl.susie <- beta.qtl.varbvs <- beta.qtl.varbvsmix <- matrix(0,nrow=q, ncol = length(qtl.pos))
+    beta.smooth.qtl.HS <- beta.smooth.qtl.EMVS <- beta.smooth.qtl.true <-  beta.smooth.qtl.lasso <- beta.smooth.qtl.SSlasso <- beta.smooth.qtl.ash <- beta.smooth.qtl.varbvs <- beta.smooth.qtl.varbvsmix<- beta.smooth.qtl.susie <- matrix(0,nrow=q, ncol = length(qtl.pos))
+    MSE_beta_smooth.HS <-MSE_beta_smooth.EMVS <- MSE_beta_smooth.lasso <- MSE_beta_smooth.SSlasso <- MSE_beta_smooth.ash <- MSE_beta_smooth.susie <- MSE_beta_smooth.varbvs<- MSE_beta_smooth.varbvsmix<- rep(0,q)
 
     for(i in 1:q){
         XB <- Xs[[i]]%*%betas[[i]]
         res.true <- smooth.beta(betas[[i]], betas[[i]], markers, window.size=10)
         beta.smooth.qtl.true[i, ] <- res.true$x[qtl.pos]
 
+
+        Hs_res <- scores(XB, Xs[[i]], betas.horseshoe[[i]], intercept.horseshoe[[i]], betas[[i]])
+        MSE_XB_HS[i] <- Hs_res[1]
+        MSE_beta_HS[i] <- Hs_res[2]
+        MSE_beta_smooth.HS[i] <- Hs_res[3]
+        beta.qtl.HS[i, ] <- Hs_res[4:(3+length(qtl.pos))]
+        beta.smooth.qtl.HS[i,] <- Hs_res[(4+length(qtl.pos)):(3+2*length(qtl.pos))]
 
         EMVS_res <- scores(XB, Xs[[i]], beta.EMVS[[i]], 0, betas[[i]])
         MSE_XB_EMVS[i] <- EMVS_res[1]
@@ -314,12 +331,13 @@ for(n in ns){
                    c(mean(MSE_XB_varbvs),mean(MSE_beta_varbvs),mean(MSE_beta_smooth.varbvs)),
                    c(mean(MSE_XB_varbvsmix),mean(MSE_beta_varbvsmix),mean(MSE_beta_smooth.varbvsmix)),
                    c(mean(MSE_XB_EMVS),mean(MSE_beta_EMVS),mean(MSE_beta_smooth.EMVS)),
-                   c(mean(MSE_XB_SSlasso),mean(MSE_beta_SSlasso),mean(MSE_beta_smooth.SSlasso))
+                   c(mean(MSE_XB_SSlasso),mean(MSE_beta_SSlasso),mean(MSE_beta_smooth.SSlasso)),
+                   c(mean(MSE_XB_HS),mean(MSE_beta_HS),mean(MSE_beta_smooth.HS))
                    )
 
 
                    rownames(Table) <- c("RMSE of $ {\\bf X} \\beta $","RMSE of $ \\beta $","RMSE of $ \\tilde{\\beta} $")
-    colnames(Table) <- c("lasso","mr.ash","susie","varbvs","varbvsmix","EMVS","SSlasso")
+    colnames(Table) <- c("lasso","mr.ash","susie","varbvs","varbvsmix","EMVS","SSlasso","horseshoe")
 
     library(xtable)
     print.xtable(xtable(Table, digits=3),type="latex",sanitize.text.function = function(x) x)
@@ -331,14 +349,18 @@ for(n in ns){
     sqrt(rowMeans(apply(beta.smooth.qtl.EMVS, 1,function(x){(x-betas[[1]][qtl.pos])^2})))
     sqrt(rowMeans(apply(beta.qtl.SSlasso, 1,function(x){(x-betas[[1]][qtl.pos])^2})))
     if(save.data){
-    saveRDS(list(MSE_beta_ash              = MSE_beta_ash,
-                 MSE_XB_ash.               = MSE_XB_ash,
+    saveRDS(list(
+                 MSE_beta_HS               = MSE_beta_HS,
+                 MSE_XB_HS                 = MSE_XB_HS,
+                 MSE_beta_smooth_HS        = MSE_beta_smooth.HS,
+                 MSE_beta_ash              = MSE_beta_ash,
+                 MSE_XB_ash                = MSE_XB_ash,
                  MSE_beta_smooth_ash       = MSE_beta_smooth.ash,
                  MSE_beta_susie            = MSE_beta_susie,
                  MSE_XB_susie.             = MSE_XB_susie,
                  MSE_beta_smooth_susie     = MSE_beta_smooth.susie,
                  MSE_beta_varbvs           = MSE_beta_varbvs,
-                 MSE_XB_varbvs.            = MSE_XB_varbvs,
+                 MSE_XB_varbvs             = MSE_XB_varbvs,
                  MSE_beta_smooth_varbvs    = MSE_beta_smooth.varbvs,
                  MSE_beta_varbvsmix        = MSE_beta_varbvsmix,
                  MSE_XB_varbvsmix          = MSE_XB_varbvsmix,
