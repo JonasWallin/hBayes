@@ -241,13 +241,8 @@ rbing.iter <- function(n.p, A, B, eigA=NULL, eigB=NULL, E0=NULL, EtAE=NULL, ret 
     Zs   <- array(0,dim=c(2,n.p*p))
     inds <- array(0,dim=c(2,n.p*p))
     for(i in 1:(n.p*p)){
-        ind.1 <- 1 + (i-1)%%p
-        ind.2 <- ind.1 + 1 - 2*(runif(1)>0.5)
-        if(ind.2 == p+1)
-            ind.2 = p-1
-        if(ind.2 == 0)
-            ind.2 = 2
-        ind <- c(ind.1,ind.2)
+        ind <- c(1 + (i-1)%%(p-1),
+                 2 + (i-1)%%(p-1) )
         if(EtAE_update[ind[1],ind[1]]==0){
             EtAE[ind[1],ind[1]] <- sum(E[,ind[1]]^2 * eigA$values)
             EtAE_update[ind[1],ind[1]] <- 1

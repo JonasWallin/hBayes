@@ -8,7 +8,7 @@ Eigen.sampler <- function(X,
                                   n.E.mcmc = 1e1,
                                   L = 6){
 
-    return(Eigen.sampler.bingham(X, n.mcmc, n.E.mcmc, L))
+    return(Eigen.sampler.bingham.v2(X, n.mcmc, n.E.mcmc, L))
 }
 
 #' eigensampler using bingham
