@@ -6,9 +6,13 @@
 Eigen.sampler <- function(X,
                                   n.mcmc=5e4,
                                   n.E.mcmc = 1e1,
-                                  L = 6){
+                                  L = 6,
+                          sample.eigenvalues=T,
+                          gamma=NULL){
 
-    return(Eigen.sampler.bingham.v2(X, n.mcmc, n.E.mcmc, L))
+    return(Eigen.sampler.bingham.v2(X, n.mcmc, n.E.mcmc, L,
+                                    sample.eigenvalues = sample.eigenvalues,
+                                    gamma = gamma))
 }
 
 #' eigensampler using bingham
@@ -101,7 +105,9 @@ Eigen.sampler.bingham <- function(X,
 Eigen.sampler.bingham.v2 <- function(X,
                                   n.mcmc=5e4,
                                   n.E.mcmc = 1e1,
-                                  L = 6){
+                                  L = 6,
+                                  sample.eigenvalues = T,
+                                  gamma = NULL){
 
     #fixing data
     n <- dim(X)[1]
@@ -119,7 +125,6 @@ Eigen.sampler.bingham.v2 <- function(X,
     mcmc.lambda <- array(dim = c(n.mcmc, p))
     mcmc.pi <- array(dim = c(n.mcmc, I))
     mcmc.gamma <- array(dim = c(p, p, n.mcmc))
-    mcmc.loglik <- rep(NA, n.mcmc)
 
 
 
@@ -128,15 +133,19 @@ Eigen.sampler.bingham.v2 <- function(X,
 
     mcmc.lambda[1,] = E$values
     mcmc.pi[1,] = rep(1/I,I)
-    mcmc.gamma[,,1] = diag(nrow=p,ncol=p)
-    mcmc.loglik[1]  <- oracle.gamma.R.loglik(R.XtX,  mcmc.gamma[,,1],mcmc.lambda[1, ], n)
+    if(is.null(gamma)==F){
+        mcmc.gamma[,,1] =  t(E$vectors)%*%gamma
+    }else{
+        mcmc.gamma[,,1] = diag(nrow=p,ncol=p)
+    }
+
 
     Lambda_hatE <- list(values = 1/E$values,
                         vectors = diag(nrow=length(E$values),ncol=length(E$values)))
     XXtE <- list(values = -E$values*n/2,
                  vectors = diag(nrow=length(E$values),ncol=length(E$values)))
 
-
+    res.E <- NULL
     for(i in 2:n.mcmc){
         # Example lambda_hat calculation (to be done per iteration in your actual Gibbs sampling)
         lambda_hat <- rowSums(mcmc.gamma[,,i-1]^2%*%diag(n*E$values))
@@ -154,16 +163,20 @@ Eigen.sampler.bingham.v2 <- function(X,
         # exp(-0.5 \Sigma E D E^T) = exp(tr(-0.5  (E^T E_S) D_S (E^T E_S)^T D ))
         ind.lambda <- order(mcmc.lambda[i, ], decreasing = T)
         mcmc.lambda[i, ] <- mcmc.lambda[i,ind.lambda]
-        Lambda_hatE$values <- 1/mcmc.lambda[i, ]
-        res.E <- rbing.iter(n.E.mcmc,
-                       A = NULL,
-                       B = NULL,
-                       eigA=Lambda_hatE,
-                       eigB=XXtE,
-                       E0=mcmc.gamma[,ind.lambda,i-1],
-                       EtAE=NULL,
-                       ret = 2)
-        mcmc.gamma[,,i] <- res.E$Es[,,n.E.mcmc]
+        if(sample.eigenvalues){
+            Lambda_hatE$values <- 1/mcmc.lambda[i, ]
+            res.E <- rbing.iter(n.E.mcmc,
+                           A = NULL,
+                           B = NULL,
+                           eigA=Lambda_hatE,
+                           eigB=XXtE,
+                           E0=mcmc.gamma[,ind.lambda,i-1],
+                           EtAE=NULL,
+                           ret = 2)
+            mcmc.gamma[,,i] <- res.E$Es[,,n.E.mcmc]
+        }else{
+            mcmc.gamma[,,i] <- mcmc.gamma[,ind.lambda,i-1]
+        }
     }
     res_Egamma <- apply(mcmc.gamma,3,function(x) E$vectors%*%x) #transform to correct scale
     mcmc.gamma <- array(res_Egamma, dim = dim(mcmc.gamma))
