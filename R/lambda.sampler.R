@@ -22,8 +22,8 @@
 #' init_params <- initLambdaSampling(E, n = 100, I = 64)
 #' print(init_params)
 initLambdaSampling <- function(E, n, I, q_low = 0.01, q_high = 0.99) {
-    a_min <- log(min(E$values) * qchisq(q_low, n) / n)
-    a_max <- log(max(E$values) * qchisq(q_high, n) / n)
+    a_min <- log(0.75*min(E$values) * qchisq(q_low, n) / n)
+    a_max <- log(1.25*max(E$values) * qchisq(q_high, n) / n)
     a_vec <- seq(a_min, a_max, length = I + 1)
     a_seq <- seq(a_min, a_max, length = I * 50)
     a_ind <- findInterval(a_seq, a_vec)
@@ -60,11 +60,10 @@ initLambdaSampling <- function(E, n, I, q_low = 0.01, q_high = 0.99) {
 #' lambda_hat <- c(1.5, 2.0, 2.5)  # Simulated lambda_hat values
 #' sampled_lambdas <- sampleLambda(lambda_hat, init_params)
 #' print(sampled_lambdas)
-sampleLambda <- function(lambda_hat,n, params) {
+sampleLambda <- function(lambda_hat,n,mcmc_pi, params) {
     # Extract parameters from the list
     a_seq <- params$a_seq
     a_ind <- params$a_ind
-    mcmc_pi <- params$mcmc_pi
     exp_a_seq <- params$exp_a_seq
 
     # Preallocate the lambda vector
