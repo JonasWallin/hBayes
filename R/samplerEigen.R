@@ -70,12 +70,13 @@ Eigen.sampler.bingham <- function(X,
     res.E <- NULL
     for(i in 2:n.mcmc){
         # Example lambda_hat calculation (to be done per iteration in your actual Gibbs sampling)
-        lambda_hat <- rowSums(mcmc.gamma[,,i-1]^2%*%diag(n*E$values))
+        lambda_hat <- colSums(diag(n*E$values)%*%mcmc.gamma[,,i-1]^2)
 
         # Sampling lambda in the Gibbs sampler
         # \pi(lambda|X) \propto lambda^{-n/2} exp( - \sum lambda_hat_i/2 * lambda_i^{-1} )*pi(\lambda)
         mcmc.lambda[i, ] <- sampleLambda(lambda_hat, n, mcmc.pi[i-1, ],init_params_Lambda)
-
+        #E_ <-  E$vectors%*%mcmc.gamma[,,i-1]
+        #E_n <- mcmc.gamma[,,i-1]
         #sample prior
         lambda.ind <- findInterval(log(mcmc.lambda[i,]), init_params_Lambda$a_vec, left.open = T)
         nvec <- table(factor(lambda.ind, levels = 1:I))

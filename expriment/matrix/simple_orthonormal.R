@@ -1,6 +1,6 @@
 n.mcmc <- 1000
-p <- 5*3
-n	<- 100
+p <- 50
+n	<- 1000
 
 set.seed(0)
 
@@ -11,7 +11,7 @@ Eigen.Sigma_hat <- eigen(t(x.smp) %*% (x.smp)/n)
 lambda.hat <- Eigen.Sigma_hat$values
 
 # Run sampler
-#res <- Eigen.sampler.bingham(x.smp,n.mcmc=n.mcmc,n.E.mcmc = 1e1,L = 6, sample.eigenvalues=T,shuffle = T)
+#res <- Eigen.sampler(x.smp,n.mcmc=n.mcmc,n.E.mcmc = 1e1,L = 6, sample.eigenvalues=T)
 
 res <- Eigen.sampler.old(x.smp,n.mcmc=n.mcmc,n.E.mcmc = 1e2,L = 6, sample.eigenvalues=T)
 
