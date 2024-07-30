@@ -11,8 +11,11 @@ void house_reflection_mult_inplace_cpp(arma::mat& Gamma,
 
     // Adjusting v_p[1]
     v_p[0] = v_p[0] - 1;
+    double con =  arma::norm(v_p, 2);
 
-    arma::vec x_m = - sqrt(2.0) * v_p / arma::norm(v_p, 2);
+    if(con==0)
+        con = 1;
+    arma::vec x_m = - sqrt(2.0) * v_p /con;
 
     arma::uvec ind = arma::regspace<arma::uvec>(p - m , p-1);
 
@@ -32,8 +35,10 @@ arma::mat house_reflection_mult_cpp(arma::mat Gamma,
 
     // Adjusting v_p[1]
     v_p[0] = v_p[0] - 1;
-
-    arma::vec x_m = - sqrt(2.0) * v_p / arma::norm(v_p, 2);
+    double con = arma::norm(v_p, 2);
+    if(arma::norm(v_p, 2)==0)
+        con = 1.;
+    arma::vec x_m = - sqrt(2.0) * v_p / con;
 
     arma::uvec ind = arma::regspace<arma::uvec>(p - m , p-1);
 

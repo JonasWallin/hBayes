@@ -31,6 +31,23 @@ rbing.2diagmatrix <- function( a, b){
     E_2 <- c(S*E_1[2],-S*E_1[1])
     return(cbind(E_1,E_2))
 }
+#'
+#' compute the density for exp(tr(AZ^TBZ))
+#' where Z(theta) = [cos(theta), sin(theta); s sin(theta), -cos(theta)]
+#'
+dbing_2x2<-function (theta, A, B, S=1, Ebasis=FALSE){
+    if(Ebasis){
+        Z_1 <- theta
+        Z_2 <- sqrt(1-theta^2)
+    }else{
+        Z_1 <- cos(theta)
+        Z_2 <- sin(theta)
+    }
+    E_1 <- c(Z_1,Z_2)
+    E_2 <- c(S*E_1[2],-S*E_1[1])
+    Z <- cbind(E_1,E_2)
+    return(exp(sum(diag(B%*%t(Z)%*%A%*%Z))))
+}
 
 #'
 #' Sampling exp(-c cos(\theta)^2) I(\theta \in [pi/2,pi])
@@ -80,6 +97,7 @@ dangle <- function(theta, c, log=F ){
         return(-c * cos(theta)^2)
     return(exp(-c * cos(theta)^2))
 }
+
 
 
 eigen_2x2 <- function(A) {
@@ -183,7 +201,7 @@ rbing <- function(n, A, B, eigA=NULL, eigB=NULL, E0=NULL, EtAE=NULL, ret = 1){
         Z <- rbing.2(EtAE[ind, ind], eigB$values[ind])
         Zs[,i] <- Z[1,]
         inds[,i] <- ind
-        EtAE[ind, ind] <- t(Z)%*%EtAE[ind, ind]%*%Z
+        EtAE[ind, ind] <- t(Z)%*%(EtAE[ind, ind]%*%Z)
         EtAE_temp <- EtAE[-ind, ind]%*%Z
         EtAE[-ind, ind] <- EtAE_temp
         EtAE[ind, -ind] <- t(EtAE_temp)

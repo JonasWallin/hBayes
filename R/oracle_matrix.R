@@ -51,7 +51,13 @@ house.reflctn	<- function(v.p,m = NULL)
         e1	<- c(rep(0,m-p),1,rep(0,p-1))
         v.m <- c(rep(0,m-p),v.p)
     }
-    x.m	<- (e1 - v.m) / sqrt(sum((e1 - v.m)^2))
+    den <- sqrt(sum((e1 - v.m)^2))
+    if(den==0){
+        x.m <- (e1 - v.m)
+    }else{
+        x.m	<- (e1 - v.m) / sqrt(sum((e1 - v.m)^2))
+    }
+
     E = - 2* x.m %*% t(x.m)
     diag(E) <- diag(E) + 1
     return( E)
@@ -130,6 +136,21 @@ vp.repr.orth.mat <- function(orth.mat)
     return(v.p.mat)
 }
 
+smp.rnd.orth.mat	<- function(n = 10)
+{
+
+    P.tmp	<- R.rho.b(runif(1,0,2*pi),1-2*rbinom(1,1,0.5))
+
+    if(2 < n)
+        for(i in 3:n)
+        {
+            v.i		<- smp.v(i)
+            hr		<- house.reflctn(v.i)
+            P.tmp	<- hr %*% cbind(c(1,rep(0,i-1)),rbind(0,P.tmp))
+        }
+
+    return(P.tmp)
+}
 
 
 #####################################################
@@ -188,32 +209,33 @@ oracle.metrop.sampler <- function(E.init, X, D, n.mtrp, target.acc = 0.23,
         gamma.right <- mtrp.gamma[,,i-1]
 
         # Run metropolis iterations for v.p vectors p to 3
-
-        for(pp in p:3)
-        {
-            #h.v.p.m <- house.reflctn(v.p.tmp[1:pp,p-pp+1],m=p)
-            #gamma.right_old <- h.v.p.m %*% gamma.right
-            house_reflection_mult_inplace_cpp(gamma.right, v.p.tmp[1:pp,p-pp+1])
-            v.prpsl <- smp.v(vm =v.p.tmp[1:pp,p-pp+1],
-                             sm = MH.objs[[pp]]$sigma)
-            gamma.left.prop <- house_reflection_mult_cpp(gamma.left,v.prpsl, right =FALSE)
-            gamma.prpsl <- gamma.left.prop %*% gamma.right
-            prpsl.loglik <- oracle.gamma.R.loglik(R, gamma.prpsl, D, n)
-
-            acc.ind[i-1,pp] <- runif(1) <= exp(prpsl.loglik - loglik.old)
-
-            if(acc.ind[i-1,pp])
+        if(p>2){
+            for(pp in p:3)
             {
-                v.p.tmp[1:pp,p-pp+1] <- v.prpsl
-                loglik.old <- prpsl.loglik
-                gamma.left <- gamma.left.prop
-            }else{
-                #gamma.left <- gamma.left %*% h.v.p.m
-                house_reflection_mult_inplace_cpp(gamma.left, v.p.tmp[1:pp,p-pp+1], FALSE)
-            }
-            MH.objs[[pp]] <- MH.adaptive(acc.ind[i-1,pp], MH.objs[[pp]])
+                #h.v.p.m <- house.reflctn(v.p.tmp[1:pp,p-pp+1],m=p)
+                #gamma.right_old <- h.v.p.m %*% gamma.right
+                house_reflection_mult_inplace_cpp(gamma.right, v.p.tmp[1:pp,p-pp+1])
+                v.prpsl <- smp.v(vm =v.p.tmp[1:pp,p-pp+1],
+                                 sm = MH.objs[[pp]]$sigma)
+                gamma.left.prop <- house_reflection_mult_cpp(gamma.left,v.prpsl, right =FALSE)
+                gamma.prpsl <- gamma.left.prop %*% gamma.right
+                prpsl.loglik <- oracle.gamma.R.loglik(R, gamma.prpsl, D, n)
 
-        }
+                acc.ind[i-1,pp] <- runif(1) <= exp(prpsl.loglik - loglik.old)
+
+                if(acc.ind[i-1,pp])
+                {
+                    v.p.tmp[1:pp,p-pp+1] <- v.prpsl
+                    loglik.old <- prpsl.loglik
+                    gamma.left <- gamma.left.prop
+                }else{
+                    #gamma.left <- gamma.left %*% h.v.p.m
+                    house_reflection_mult_inplace_cpp(gamma.left, v.p.tmp[1:pp,p-pp+1], FALSE)
+                }
+                MH.objs[[pp]] <- MH.adaptive(acc.ind[i-1,pp], MH.objs[[pp]])
+
+            }
+            }
 
         # Sample metropolis sample for rho keeping b fixed as in MLE
 
@@ -243,6 +265,8 @@ oracle.metrop.sampler <- function(E.init, X, D, n.mtrp, target.acc = 0.23,
                 MH.objs =MH.objs ))
 
 }
+
+
 
 #'
 #' Sampling the eigenvectors

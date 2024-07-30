@@ -8,12 +8,15 @@ Eigen.sampler <- function(X,
                                   n.E.mcmc = 1e1,
                                   L = 6,
                           sample.eigenvalues=T,
-                          gamma=NULL){
+                          sample.eigenvector=T,
+                          gamma=NULL,
+                          verbose=FALSE){
 
     return(Eigen.sampler.bingham(X, n.mcmc, n.E.mcmc, L,
                                     sample.eigenvalues = sample.eigenvalues,
+                                 sample.eigenvector = sample.eigenvector,
                                     gamma = gamma,
-                                 shuffle=FALSE))
+                                 shuffle=FALSE,verbose=verbose))
 }
 
 
@@ -28,8 +31,10 @@ Eigen.sampler.bingham <- function(X,
                                   n.E.mcmc = 1e1,
                                   L = 6,
                                   sample.eigenvalues = T,
+                                  sample.eigenvector=T,
                                   gamma = NULL,
-                                  shuffle=FALSE){
+                                  shuffle=FALSE,
+                                  verbose=FALSE){
 
     #fixing data
     n <- dim(X)[1]
@@ -69,12 +74,20 @@ Eigen.sampler.bingham <- function(X,
 
     res.E <- NULL
     for(i in 2:n.mcmc){
+        if(verbose){
+            if(i%%500==0)
+                cat('sample = ',i,' of ',n.mcmc,'\n')
+        }
+        if(sample.eigenvalues){
         # Example lambda_hat calculation (to be done per iteration in your actual Gibbs sampling)
-        lambda_hat <- colSums(diag(n*E$values)%*%mcmc.gamma[,,i-1]^2)
+            lambda_hat <- colSums(diag(n*E$values)%*%mcmc.gamma[,,i-1]^2)
+            # Sampling lambda in the Gibbs sampler
+            # \pi(lambda|X) \propto lambda^{-n/2} exp( - \sum lambda_hat_i/2 * lambda_i^{-1} )*pi(\lambda)
+            mcmc.lambda[i, ] <- sampleLambda(lambda_hat, n, mcmc.pi[i-1, ],init_params_Lambda)
+        }else{
+            mcmc.lambda[i, ] <- mcmc.lambda[i-1, ]
+        }
 
-        # Sampling lambda in the Gibbs sampler
-        # \pi(lambda|X) \propto lambda^{-n/2} exp( - \sum lambda_hat_i/2 * lambda_i^{-1} )*pi(\lambda)
-        mcmc.lambda[i, ] <- sampleLambda(lambda_hat, n, mcmc.pi[i-1, ],init_params_Lambda)
         #E_ <-  E$vectors%*%mcmc.gamma[,,i-1]
         #E_n <- mcmc.gamma[,,i-1]
         #sample prior
@@ -86,14 +99,14 @@ Eigen.sampler.bingham <- function(X,
         # exp(-0.5 \Sigma E D E^T) = exp(tr(-0.5  (E^T E_S) D_S (E^T E_S)^T D ))
         ind.lambda <- order(mcmc.lambda[i, ], decreasing = T)
         mcmc.lambda[i, ] <- mcmc.lambda[i,ind.lambda]
-        if(sample.eigenvalues){
+        if(sample.eigenvector){
             Lambda_hatE$values <- 1/mcmc.lambda[i, ]
             if(shuffle==FALSE){
                 res.E <- rbing.iter(n.E.mcmc,
                                A = NULL,
                                B = NULL,
-                               eigA=Lambda_hatE,
-                               eigB=XXtE,
+                               eigA=XXtE,
+                               eigB=Lambda_hatE,
                                E0=mcmc.gamma[,ind.lambda,i-1],
                                EtAE=NULL,
                                ret = 2)
@@ -135,7 +148,9 @@ Eigen.sampler.old <- function(X,
                           n.E.mcmc = 1e1,
                           L = 6,
                           sample.eigenvalues = T,
-                          gamma = NULL){
+                          sample.eigenvector=T,
+                          gamma = NULL,
+                          verbose=FALSE){
 
     #fixing data
     n <- dim(X)[1]
@@ -168,20 +183,27 @@ Eigen.sampler.old <- function(X,
         mcmc.gamma[,,1] = E$vectors
     }
     mcmc.loglik[1]  <- oracle.gamma.R.loglik(R.XtX,  mcmc.gamma[,,1],mcmc.lambda[1, ], n)
-    if(sample.eigenvalues){
+    if(sample.eigenvector){
         res.E <- oracle.metrop.sampler(E$vectors,X, E$values, n.E.mcmc)
     }else{
         res.E <- NULL
     }
-
+    ind.lambda <- 1:p
     for(i in 2:n.mcmc){
-        # Example lambda_hat calculation (to be done per iteration in your actual Gibbs sampling)
-        lambda_hat <- colSums((R.XtX%*% mcmc.gamma[,,i-1])^2)
+        if(verbose){
+            if(i%%500==0)
+                cat('sample = ',i,' of ',n.mcmc,'\n')
+        }
+        if(sample.eigenvalues){
+            # Example lambda_hat calculation (to be done per iteration in your actual Gibbs sampling)
+            lambda_hat <- colSums((R.XtX%*% mcmc.gamma[,,i-1])^2)
 
-        # Sampling lambda in the Gibbs sampler
-        # \pi(lambda|X) \propto lambda^{-n/2} exp( - \sum lambda_hat_i/2 * lambda_i^{-1} )*pi(\lambda)
-        mcmc.lambda[i, ] <- sampleLambda(lambda_hat, n,  mcmc.pi[i-1, ],init_params_Lambda)
-
+            # Sampling lambda in the Gibbs sampler
+            # \pi(lambda|X) \propto lambda^{-n/2} exp( - \sum lambda_hat_i/2 * lambda_i^{-1} )*pi(\lambda)
+            mcmc.lambda[i, ] <- sampleLambda(lambda_hat, n,  mcmc.pi[i-1, ],init_params_Lambda)
+        }else{
+            mcmc.lambda[i, ] <- mcmc.lambda[i-1, ]
+        }
         #sample prior
         lambda.ind <- findInterval(log(mcmc.lambda[i,]), init_params_Lambda$a_vec, left.open = T)
         nvec <- table(factor(lambda.ind, levels = 1:I))
@@ -191,7 +213,7 @@ Eigen.sampler.old <- function(X,
         # exp(-0.5 \Sigma E D E^T) = exp(tr(-0.5  (E^T E_S) D_S (E^T E_S)^T D ))
         ind.lambda <- order(mcmc.lambda[i, ], decreasing = T)
         mcmc.lambda[i, ] <- mcmc.lambda[i,ind.lambda]
-        if(sample.eigenvalues){
+        if(sample.eigenvector){
             res.E <- oracle.metrop.sampler(mcmc.gamma[,ind.lambda,i-1],
                                            X,
                                            mcmc.lambda[i, ],
@@ -208,6 +230,7 @@ Eigen.sampler.old <- function(X,
     return(list(lambda = mcmc.lambda,
            pi = mcmc.pi,
            gamma = mcmc.gamma,
-           gamma.obj =res.E
+           gamma.obj =res.E,
+           lambda.param = init_params_Lambda
            ))
 }
