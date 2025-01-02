@@ -245,7 +245,7 @@ oracle.metrop.sampler <- function(E.init, X, D, n.mtrp, target.acc = 0.23,
         prpsl.loglik <- oracle.gamma.R.loglik(R,gamma.prpsl, D, n)
 
         acc.ind[i-1,2] <- runif(1) <= exp(prpsl.loglik - loglik.old)
-
+        print( exp(prpsl.loglik - loglik.old))
         if(acc.ind[i-1,2])
         {
             v.p.tmp[1,p-1] <- rho.prpsl
